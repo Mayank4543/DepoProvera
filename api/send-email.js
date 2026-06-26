@@ -1,9 +1,7 @@
 import nodemailer from "nodemailer";
 
-// ── Config ────────────────────────────────────────────────────────────────────
 const POST_URL = "https://nlcr.cagsys.com/leadPost.php?cid=53&fid=3224";
 
-// All US states allowed by the spec
 const ALLOWED_STATES = new Set([
   "AL",
   "AK",
@@ -55,7 +53,6 @@ const ALLOWED_STATES = new Set([
   "WY",
 ]);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function digitsOnly(value) {
   return (value || "").toString().replace(/\D/g, "");
 }
@@ -66,7 +63,6 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "";
 }
 
-// ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -81,36 +77,31 @@ export default async function handler(req, res) {
 
     const data = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-    // ── Field extraction ──────────────────────────────────────────────
     const phone = digitsOnly(data?.phone);
     const mobile = digitsOnly(data?.mobile);
     const state = (data?.state || "").toUpperCase();
     const usedDepoProvera = (data?.UsedDepoProvera || "").trim();
 
-    // ── Required-field validation (per spec) ──────────────────────────
+    // ── Validation ────────────────────────────────────────────────────
     const errors = {};
-
     if (!data?.fname) errors.fname = "required";
     if (!data?.lname) errors.lname = "required";
     if (!(phone.length === 10 || phone.length === 11))
       errors.phone = "required, must be 10–11 digits";
     if (!data?.email) errors.email = "required";
     if (!state || !ALLOWED_STATES.has(state))
-      errors.state = `required; must be one of the allowed two-letter US state codes`;
+      errors.state = "required; must be a valid 2-letter US state";
     if (!usedDepoProvera || !["Y", "Yes"].includes(usedDepoProvera))
-      errors.UsedDepoProvera = "required; must be 'Y' or 'Yes'";
+      errors.UsedDepoProvera = "required; must be Y or Yes";
     if (!data?.t_id) errors.t_id = "required (Trusted Form URL)";
 
     if (Object.keys(errors).length) {
       return res.status(400).json({ status: 4, errors: [errors] });
     }
 
-    // ── IP: prefer form-supplied, fall back to request IP ─────────────
     const ipAddress = (data?.IPAddress || "").trim() || getClientIp(req);
 
-    // ── Assemble full payload (matches spec field names exactly) ──────
     const lead = {
-      // Required
       fname: data.fname,
       lname: data.lname,
       phone,
@@ -119,15 +110,12 @@ export default async function handler(req, res) {
       IPAddress: ipAddress,
       UsedDepoProvera: usedDepoProvera,
       t_id: data.t_id,
-      // Optional – contact
       initial: data.initial || "",
       mobile: mobile || "",
-      // Optional – address
       address1: data.address1 || "",
       address2: data.address2 || "",
       city: data.city || "",
       zip: data.zip || "",
-      // Optional – notes & tracking
       Comments: data.Comments || "",
       SubId: data.SubId || "",
       SubId2: data.SubId2 || "",
@@ -135,37 +123,61 @@ export default async function handler(req, res) {
       VendorLeadId: data.VendorLeadId || "",
     };
 
-    // ── POST lead to Digital Gen Media endpoint ───────────────────────
-    // Build a URL-encoded form body (standard for leadPost.php endpoints)
+    // ── STEP 1: POST lead to nlcr.cagsys.com ─────────────────────────
     const formBody = new URLSearchParams();
     Object.entries(lead).forEach(([key, value]) => {
       if (value !== "") formBody.append(key, value);
     });
 
-    let phonexaStatus = "not attempted";
-    let phonexaResponse = "";
+    let postStatus = "";
+    let postResponse = "";
 
+    // Hard network error → return 502 immediately, do NOT send email
+    let postRes;
     try {
-      const postRes = await fetch(POST_URL, {
+      postRes = await fetch(POST_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (compatible; LeadPoster/1.0)",
+        },
         body: formBody.toString(),
       });
-      phonexaResponse = await postRes.text();
-      phonexaStatus = `HTTP ${postRes.status} – ${postRes.statusText}`;
-      console.log("Lead post response:", phonexaStatus, phonexaResponse);
-    } catch (postErr) {
-      phonexaStatus = `FETCH ERROR: ${postErr.message}`;
-      phonexaResponse = "";
-      console.error("Lead post failed:", postErr);
+    } catch (networkErr) {
+      console.error("Lead POST network error:", networkErr.message);
+      return res.status(502).json({
+        error:
+          "Network error – could not reach lead endpoint. Check Vercel outbound firewall / allowed domains.",
+        detail: networkErr.message,
+        postUrl: POST_URL,
+      });
     }
 
-    // ── Email body ────────────────────────────────────────────────────
+    postResponse = await postRes.text();
+    postStatus = `HTTP ${postRes.status} – ${postRes.statusText}`;
+    console.log("Lead POST result:", postStatus, postResponse);
+
+    // Non-2xx → return error immediately, do NOT send email
+    if (!postRes.ok) {
+      console.error("Lead POST rejected:", postStatus, postResponse);
+      return res.status(502).json({
+        error: "Lead endpoint rejected the submission.",
+        status: postStatus,
+        response: postResponse,
+        postUrl: POST_URL,
+      });
+    }
+
+    // ── STEP 2: Email (only fires if POST succeeded) ──────────────────
     const or = (v) => v || "—";
 
     const message = `
 New Depo Provera Lead — Digital Gen Media CPA Spec
 Post URL: ${POST_URL}
+
+━━━ LEAD POST RESULT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Status:                ${postStatus}
+Response:              ${postResponse || "—"}
 
 ━━━ REQUIRED FIELDS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 First Name:            ${or(lead.fname)}
@@ -193,14 +205,8 @@ SubId2:                ${or(lead.SubId2)}
 Click ID:              ${or(lead.clickid)}
 Vendor Lead ID:        ${or(lead.VendorLeadId)}
 Comments:              ${or(lead.Comments)}
-
-━━━ LEAD POST RESULT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Post URL:              ${POST_URL}
-Status:                ${phonexaStatus}
-Response:              ${phonexaResponse || "—"}
 `.trim();
 
-    // ── Send email ────────────────────────────────────────────────────
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -216,9 +222,9 @@ Response:              ${phonexaResponse || "—"}
       text: message,
     });
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, leadPostStatus: postStatus });
   } catch (error) {
-    console.error("send-email handler error:", error);
-    return res.status(500).json({ error: "Email failed" });
+    console.error("Handler error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }
