@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depo Provera Lead Form - Digital Gen Media</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #111827;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --accent: #22c55e;
+            --danger: #ef4444;
+            --border: #374151;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(160deg, #020617, #0f172a);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 22px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        fieldset {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            padding: 14px;
+        }
+
+        legend {
+            color: #d1d5db;
+            font-size: 13px;
+            padding: 0 6px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 13px;
+            color: #d1d5db;
+        }
+
+        label .req {
+            color: var(--danger);
+        }
+
+        input,
+        select,
+        textarea,
+        button {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #0b1220;
+            color: var(--text);
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        select option {
+            background: #0b1220;
+        }
+
+        textarea {
+            min-height: 70px;
+            resize: vertical;
+        }
+
+        button {
+            cursor: pointer;
+            background: var(--accent);
+            color: #052e16;
+            border: 0;
+            font-weight: 700;
+            margin-top: 8px;
+            padding: 12px;
+            font-size: 15px;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .status {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            display: none;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        .status.ok {
+            display: block;
+            background: #052e16;
+            color: #bbf7d0;
+            border: 1px solid #15803d;
+        }
+
+        .status.error {
+            display: block;
+            background: #450a0a;
+            color: #fecaca;
+            border: 1px solid #b91c1c;
+        }
+
+        .small {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        @media (max-width: 760px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Depo Provera Lead Form</h1>
+
+
+        <form id="leadForm">
+
+            <fieldset>
+                <legend>Required Fields</legend>
+                <div class="grid">
+
+                    <div class="field">
+                        <label for="fname">First Name <span class="req">*</span></label>
+                        <input id="fname" name="fname" placeholder="Jane" required />
+                    </div>
+
+                    <div class="field">
+                        <label for="lname">Last Name <span class="req">*</span></label>
+                        <input id="lname" name="lname" placeholder="Doe" required />
+                    </div>
+
+                    <div class="field">
+                        <label for="phone">Home Phone <span class="req">*</span></label>
+                        <input id="phone" name="phone" placeholder="5555555555" required />
+                        <span class="small">Numeric, 10–11 digits</span>
+                    </div>
+
+                    <div class="field">
+                        <label for="email">Email Address <span class="req">*</span></label>
+                        <input id="email" name="email" type="email" placeholder="jane@example.com" required />
+                    </div>
+
+                    <div class="field">
+                        <label for="state">State <span class="req">*</span></label>
+                        <select id="state" name="state" required>
+                            <option value="">— Select State —</option>
+                            <option>AL</option>
+                            <option>AK</option>
+                            <option>AZ</option>
+                            <option>AR</option>
+                            <option>CA</option>
+                            <option>CO</option>
+                            <option>CT</option>
+                            <option>DC</option>
+                            <option>DE</option>
+                            <option>FL</option>
+                            <option>GA</option>
+                            <option>HI</option>
+                            <option>ID</option>
+                            <option>IL</option>
+                            <option>IA</option>
+                            <option>KS</option>
+                            <option>KY</option>
+                            <option>ME</option>
+                            <option>MD</option>
+                            <option>MA</option>
+                            <option>MI</option>
+                            <option>MN</option>
+                            <option>MS</option>
+                            <option>MO</option>
+                            <option>MT</option>
+                            <option>NE</option>
+                            <option>NV</option>
+                            <option>NH</option>
+                            <option>NJ</option>
+                            <option>NM</option>
+                            <option>NY</option>
+                            <option>NC</option>
+                            <option>ND</option>
+                            <option>OH</option>
+                            <option>OK</option>
+                            <option>OR</option>
+                            <option>PA</option>
+                            <option>RI</option>
+                            <option>SC</option>
+                            <option>SD</option>
+                            <option>TX</option>
+                            <option>UT</option>
+                            <option>VT</option>
+                            <option>VA</option>
+                            <option>WA</option>
+                            <option>WV</option>
+                            <option>WI</option>
+                            <option>WY</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="IPAddress">Opt-In IP Address <span class="req">*</span></label>
+                        <input id="IPAddress" name="IPAddress" placeholder="Auto-detected if blank" />
+                        <span class="small">Leave blank to auto-detect server-side</span>
+                    </div>
+
+                    <div class="field full">
+                        <label for="UsedDepoProvera">
+                            Have you or a loved one been diagnosed with a brain tumor after using the Depo birth control
+                            shot?
+                            <span class="req">*</span>
+                        </label>
+                        <select id="UsedDepoProvera" name="UsedDepoProvera" required>
+                            <option value="">— Select —</option>
+                            <option value="Yes">Yes</option>
+                            <option value="Y">Y</option>
+                        </select>
+                    </div>
+
+                    <div class="field full">
+                        <label for="t_id">Trusted Form Certificate URL <span class="req">*</span></label>
+                        <input id="t_id" name="t_id" type="url" placeholder="https://cert.trustedform.com/..."
+                            required />
+                    </div>
+
+                </div>
+            </fieldset>
+
+
+
+            <button id="submitBtn" type="submit">Submit </button>
+            <div id="status" class="status" aria-live="polite"></div>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById("leadForm");
+        const statusEl = document.getElementById("status");
+        const submitBtn = document.getElementById("submitBtn");
+
+        function setStatus(message, type) {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function digitsOnly(value) {
+            return (value || "").toString().replace(/\D/g, "");
+        }
+
+        function validPhone(phone) {
+            const d = digitsOnly(phone);
+            return d.length === 10 || d.length === 11;
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            statusEl.className = "status";
+
+            const data = new FormData(form);
+            const get = (name) => (data.get(name) || "").toString().trim();
+
+            // ── Client-side validation ─────────────────────────────────────
+            if (!get("fname")) { setStatus("First Name is required.", "error"); return; }
+            if (!get("lname")) { setStatus("Last Name is required.", "error"); return; }
+            if (!validPhone(get("phone"))) { setStatus("Home Phone must be 10–11 digits (numbers only).", "error"); return; }
+            if (!get("email")) { setStatus("Email Address is required.", "error"); return; }
+            if (!get("state")) { setStatus("State is required.", "error"); return; }
+            if (!get("UsedDepoProvera")) { setStatus("Please answer the Depo Provera diagnosis question.", "error"); return; }
+            if (!get("t_id")) { setStatus("Trusted Form Certificate URL is required.", "error"); return; }
+
+            // ── Build payload ──────────────────────────────────────────────
+            const payload = {
+                fname: get("fname"),
+                lname: get("lname"),
+                phone: digitsOnly(get("phone")),
+                email: get("email"),
+                state: get("state"),
+                IPAddress: get("IPAddress"),
+                UsedDepoProvera: get("UsedDepoProvera"),
+                t_id: get("t_id"),
+
+
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting…";
+
+            try {
+                const emailRes = await fetch("/api/send-email", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!emailRes.ok) {
+                    const errBody = await emailRes.json().catch(() => ({}));
+                    throw new Error(errBody.error || "Email delivery failed.");
+                }
+
+                setStatus("Lead submitted successfully and emailed for processing.", "ok");
+                form.reset();
+            } catch (error) {
+                setStatus(`Submission failed: ${error.message}`, "error");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Submit Lead";
+            }
+        });
+    </script>
+</body>
+
+</html>
