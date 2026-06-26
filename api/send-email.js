@@ -150,17 +150,6 @@ export default async function handler(req, res) {
       IPAddress: ipAddress,
       UsedDepoProvera: usedDepoProvera,
       t_id: data.t_id,
-      initial: data.initial || "",
-      mobile: mobileFormatted,
-      address1: data.address1 || "",
-      address2: data.address2 || "",
-      city: data.city || "",
-      zip: data.zip || "",
-      Comments: data.Comments || "",
-      SubId: data.SubId || "",
-      SubId2: data.SubId2 || "",
-      clickid: data.clickid || "",
-      VendorLeadId: data.VendorLeadId || "",
     };
 
     // ── POST lead ─────────────────────────────────────────────────────
@@ -221,22 +210,6 @@ Opt-In IP Address:     ${or(lead.IPAddress)}
 Used Depo Provera:     ${or(lead.UsedDepoProvera)}
 Trusted Form (t_id):   ${or(lead.t_id)}
 
-━━━ OPTIONAL – CONTACT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Initial:               ${or(lead.initial)}
-Mobile Phone:          ${or(lead.mobile)}
-
-━━━ OPTIONAL – ADDRESS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Address Line 1:        ${or(lead.address1)}
-Address Line 2:        ${or(lead.address2)}
-City:                  ${or(lead.city)}
-Zip:                   ${or(lead.zip)}
-
-━━━ OPTIONAL – TRACKING & NOTES ━━━━━━━━━━━━━━━━━━━
-SubId:                 ${or(lead.SubId)}
-SubId2:                ${or(lead.SubId2)}
-Click ID:              ${or(lead.clickid)}
-Vendor Lead ID:        ${or(lead.VendorLeadId)}
-Comments:              ${or(lead.Comments)}
 `.trim();
 
     const transporter = nodemailer.createTransport({
