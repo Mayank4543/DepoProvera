@@ -122,8 +122,43 @@ export default async function handler(req, res) {
       // Optional – contact
       initial: data.initial || "",
       mobile: mobile || "",
-     
+      // Optional – address
+      address1: data.address1 || "",
+      address2: data.address2 || "",
+      city: data.city || "",
+      zip: data.zip || "",
+      // Optional – notes & tracking
+      Comments: data.Comments || "",
+      SubId: data.SubId || "",
+      SubId2: data.SubId2 || "",
+      clickid: data.clickid || "",
+      VendorLeadId: data.VendorLeadId || "",
     };
+
+    // ── POST lead to Digital Gen Media endpoint ───────────────────────
+    // Build a URL-encoded form body (standard for leadPost.php endpoints)
+    const formBody = new URLSearchParams();
+    Object.entries(lead).forEach(([key, value]) => {
+      if (value !== "") formBody.append(key, value);
+    });
+
+    let phonexaStatus = "not attempted";
+    let phonexaResponse = "";
+
+    try {
+      const postRes = await fetch(POST_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formBody.toString(),
+      });
+      phonexaResponse = await postRes.text();
+      phonexaStatus = `HTTP ${postRes.status} – ${postRes.statusText}`;
+      console.log("Lead post response:", phonexaStatus, phonexaResponse);
+    } catch (postErr) {
+      phonexaStatus = `FETCH ERROR: ${postErr.message}`;
+      phonexaResponse = "";
+      console.error("Lead post failed:", postErr);
+    }
 
     // ── Email body ────────────────────────────────────────────────────
     const or = (v) => v || "—";
@@ -142,6 +177,27 @@ Opt-In IP Address:     ${or(lead.IPAddress)}
 Used Depo Provera:     ${or(lead.UsedDepoProvera)}
 Trusted Form (t_id):   ${or(lead.t_id)}
 
+━━━ OPTIONAL – CONTACT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Initial:               ${or(lead.initial)}
+Mobile Phone:          ${or(lead.mobile)}
+
+━━━ OPTIONAL – ADDRESS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Address Line 1:        ${or(lead.address1)}
+Address Line 2:        ${or(lead.address2)}
+City:                  ${or(lead.city)}
+Zip:                   ${or(lead.zip)}
+
+━━━ OPTIONAL – TRACKING & NOTES ━━━━━━━━━━━━━━━━━━━
+SubId:                 ${or(lead.SubId)}
+SubId2:                ${or(lead.SubId2)}
+Click ID:              ${or(lead.clickid)}
+Vendor Lead ID:        ${or(lead.VendorLeadId)}
+Comments:              ${or(lead.Comments)}
+
+━━━ LEAD POST RESULT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Post URL:              ${POST_URL}
+Status:                ${phonexaStatus}
+Response:              ${phonexaResponse || "—"}
 `.trim();
 
     // ── Send email ────────────────────────────────────────────────────
