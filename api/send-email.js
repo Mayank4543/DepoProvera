@@ -57,17 +57,41 @@ function digitsOnly(value) {
   return (value || "").toString().replace(/\D/g, "");
 }
 
-function getClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.socket?.remoteAddress || "";
-}
-
 // Format 10-digit number as (555) 123-4567
 function formatPhone(raw) {
-  const d = digitsOnly(raw).replace(/^1/, ""); // strip country code if present
-  if (d.length !== 10) return d; // fallback to raw digits if unexpected length
+  const d = digitsOnly(raw).replace(/^1/, "");
+  if (d.length !== 10) return d;
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
+// Extract a clean public IPv4 from request headers
+// Returns empty string if none found — caller must use form-supplied IP instead
+function getPublicIpv4(req) {
+  const sources = [
+    req.headers["x-real-ip"],
+    req.headers["x-forwarded-for"],
+    req.headers["cf-connecting-ip"], // Cloudflare
+    req.headers["x-client-ip"],
+  ];
+
+  for (const src of sources) {
+    if (!src) continue;
+    // x-forwarded-for can be a comma list — take the first
+    const candidates = src.split(",").map((s) => s.trim());
+    for (const ip of candidates) {
+      // Must be a valid public IPv4 — reject loopback, private, IPv6
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+        const parts = ip.split(".").map(Number);
+        const isPrivate =
+          parts[0] === 10 ||
+          parts[0] === 127 ||
+          (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+          (parts[0] === 192 && parts[1] === 168);
+        if (!isPrivate) return ip;
+      }
+    }
+  }
+  return "";
 }
 
 export default async function handler(req, res) {
@@ -106,9 +130,23 @@ export default async function handler(req, res) {
       return res.status(400).json({ status: 4, errors: [errors] });
     }
 
-    const ipAddress = (data?.IPAddress || "").trim() || getClientIp(req);
+    // ── IP Resolution — priority order: ──────────────────────────────
+    // 1. Form-supplied IP (user's browser fetched it via ipify before submit)
+    // 2. Public IPv4 from request headers (Vercel passes real IP in x-forwarded-for)
+    // 3. Fallback empty string (endpoint will reject — better than sending garbage)
+    const formIp = (data?.IPAddress || "").trim();
+    const headerIp = getPublicIpv4(req);
+    const ipAddress = formIp || headerIp || "";
 
-    // Send phone as (555) 123-4567 — most leadPost.php endpoints expect this
+    console.log(
+      "IP resolution — form:",
+      formIp,
+      "| header:",
+      headerIp,
+      "| using:",
+      ipAddress,
+    );
+
     const phoneFormatted = formatPhone(phoneRaw);
     const mobileFormatted = mobileRaw ? formatPhone(mobileRaw) : "";
 
@@ -134,7 +172,7 @@ export default async function handler(req, res) {
       VendorLeadId: data.VendorLeadId || "",
     };
 
-    // ── STEP 1: POST lead to nlcr.cagsys.com ─────────────────────────
+    // ── STEP 1: POST lead ─────────────────────────────────────────────
     const formBody = new URLSearchParams();
     Object.entries(lead).forEach(([key, value]) => {
       if (value !== "") formBody.append(key, value);
@@ -158,17 +196,15 @@ export default async function handler(req, res) {
       return res.status(502).json({
         error: "Network error – could not reach lead endpoint.",
         detail: networkErr.message,
-        postUrl: POST_URL,
       });
     }
 
     postResponse = await postRes.text();
     postStatus = `HTTP ${postRes.status} – ${postRes.statusText}`;
     console.log("Lead POST result:", postStatus, postResponse);
-    console.log("Phone sent:", phoneFormatted);
+    console.log("Phone sent:", phoneFormatted, "| IP sent:", ipAddress);
 
     if (!postRes.ok) {
-      console.error("Lead POST rejected:", postStatus, postResponse);
       return res.status(502).json({
         error: "Lead endpoint rejected the submission.",
         status: postStatus,
@@ -176,7 +212,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── STEP 2: Email (only if POST succeeded) ────────────────────────
+    // ── STEP 2: Email ─────────────────────────────────────────────────
     const or = (v) => v || "—";
 
     const message = `
@@ -217,10 +253,7 @@ Comments:              ${or(lead.Comments)}
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
     });
 
     await transporter.sendMail({
@@ -230,13 +263,11 @@ Comments:              ${or(lead.Comments)}
       text: message,
     });
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        leadPostStatus: postStatus,
-        leadPostResponse: postResponse,
-      });
+    return res.status(200).json({
+      success: true,
+      leadPostStatus: postStatus,
+      leadPostResponse: postResponse,
+    });
   } catch (error) {
     console.error("Handler error:", error);
     return res.status(500).json({ error: "Internal server error" });

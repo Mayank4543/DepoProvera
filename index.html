@@ -165,9 +165,9 @@
     <div class="container">
         <h1>Depo Provera Lead Form</h1>
 
-
         <form id="leadForm">
 
+            <!-- ── REQUIRED ──────────────────────────────────────────────── -->
             <fieldset>
                 <legend>Required Fields</legend>
                 <div class="grid">
@@ -278,7 +278,11 @@
 
 
 
-            <button id="submitBtn" type="submit">Submit </button>
+
+
+
+
+            <button id="submitBtn" type="submit">Submit Lead</button>
             <div id="status" class="status" aria-live="polite"></div>
         </form>
     </div>
@@ -287,6 +291,18 @@
         const form = document.getElementById("leadForm");
         const statusEl = document.getElementById("status");
         const submitBtn = document.getElementById("submitBtn");
+
+        // Fetch user's real public IP from ipify on page load — store for submit
+        let userPublicIp = "";
+        fetch("https://api.ipify.org?format=json")
+            .then(r => r.json())
+            .then(d => {
+                userPublicIp = d.ip || "";
+                const ipField = document.getElementById("IPAddress");
+                // Only auto-fill if user hasn't manually entered one
+                if (ipField && !ipField.value) ipField.placeholder = userPublicIp || "Auto-detected";
+            })
+            .catch(() => { userPublicIp = ""; });
 
         function setStatus(message, type) {
             statusEl.textContent = message;
@@ -318,6 +334,10 @@
             if (!get("UsedDepoProvera")) { setStatus("Please answer the Depo Provera diagnosis question.", "error"); return; }
             if (!get("t_id")) { setStatus("Trusted Form Certificate URL is required.", "error"); return; }
 
+            // ── IP: manual input > ipify fetch > empty (server will try headers) ──
+            const manualIp = get("IPAddress");
+            const resolvedIp = manualIp || userPublicIp || "";
+
             // ── Build payload ──────────────────────────────────────────────
             const payload = {
                 fname: get("fname"),
@@ -325,10 +345,9 @@
                 phone: digitsOnly(get("phone")),
                 email: get("email"),
                 state: get("state"),
-                IPAddress: get("IPAddress"),
+                IPAddress: resolvedIp,
                 UsedDepoProvera: get("UsedDepoProvera"),
                 t_id: get("t_id"),
-
 
             };
 
@@ -357,6 +376,7 @@
             }
         });
     </script>
+
 </body>
 
 </html>
