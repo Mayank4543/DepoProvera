@@ -63,6 +63,13 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "";
 }
 
+// Format 10-digit number as (555) 123-4567
+function formatPhone(raw) {
+  const d = digitsOnly(raw).replace(/^1/, ""); // strip country code if present
+  if (d.length !== 10) return d; // fallback to raw digits if unexpected length
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -77,8 +84,8 @@ export default async function handler(req, res) {
 
     const data = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-    const phone = digitsOnly(data?.phone);
-    const mobile = digitsOnly(data?.mobile);
+    const phoneRaw = digitsOnly(data?.phone);
+    const mobileRaw = digitsOnly(data?.mobile);
     const state = (data?.state || "").toUpperCase();
     const usedDepoProvera = (data?.UsedDepoProvera || "").trim();
 
@@ -86,7 +93,7 @@ export default async function handler(req, res) {
     const errors = {};
     if (!data?.fname) errors.fname = "required";
     if (!data?.lname) errors.lname = "required";
-    if (!(phone.length === 10 || phone.length === 11))
+    if (!(phoneRaw.length === 10 || phoneRaw.length === 11))
       errors.phone = "required, must be 10–11 digits";
     if (!data?.email) errors.email = "required";
     if (!state || !ALLOWED_STATES.has(state))
@@ -101,17 +108,21 @@ export default async function handler(req, res) {
 
     const ipAddress = (data?.IPAddress || "").trim() || getClientIp(req);
 
+    // Send phone as (555) 123-4567 — most leadPost.php endpoints expect this
+    const phoneFormatted = formatPhone(phoneRaw);
+    const mobileFormatted = mobileRaw ? formatPhone(mobileRaw) : "";
+
     const lead = {
       fname: data.fname,
       lname: data.lname,
-      phone,
+      phone: phoneFormatted,
       email: data.email,
       state,
       IPAddress: ipAddress,
       UsedDepoProvera: usedDepoProvera,
       t_id: data.t_id,
       initial: data.initial || "",
-      mobile: mobile || "",
+      mobile: mobileFormatted,
       address1: data.address1 || "",
       address2: data.address2 || "",
       city: data.city || "",
@@ -132,7 +143,6 @@ export default async function handler(req, res) {
     let postStatus = "";
     let postResponse = "";
 
-    // Hard network error → return 502 immediately, do NOT send email
     let postRes;
     try {
       postRes = await fetch(POST_URL, {
@@ -146,8 +156,7 @@ export default async function handler(req, res) {
     } catch (networkErr) {
       console.error("Lead POST network error:", networkErr.message);
       return res.status(502).json({
-        error:
-          "Network error – could not reach lead endpoint. Check Vercel outbound firewall / allowed domains.",
+        error: "Network error – could not reach lead endpoint.",
         detail: networkErr.message,
         postUrl: POST_URL,
       });
@@ -156,19 +165,18 @@ export default async function handler(req, res) {
     postResponse = await postRes.text();
     postStatus = `HTTP ${postRes.status} – ${postRes.statusText}`;
     console.log("Lead POST result:", postStatus, postResponse);
+    console.log("Phone sent:", phoneFormatted);
 
-    // Non-2xx → return error immediately, do NOT send email
     if (!postRes.ok) {
       console.error("Lead POST rejected:", postStatus, postResponse);
       return res.status(502).json({
         error: "Lead endpoint rejected the submission.",
         status: postStatus,
         response: postResponse,
-        postUrl: POST_URL,
       });
     }
 
-    // ── STEP 2: Email (only fires if POST succeeded) ──────────────────
+    // ── STEP 2: Email (only if POST succeeded) ────────────────────────
     const or = (v) => v || "—";
 
     const message = `
@@ -222,7 +230,13 @@ Comments:              ${or(lead.Comments)}
       text: message,
     });
 
-    return res.status(200).json({ success: true, leadPostStatus: postStatus });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        leadPostStatus: postStatus,
+        leadPostResponse: postResponse,
+      });
   } catch (error) {
     console.error("Handler error:", error);
     return res.status(500).json({ error: "Internal server error" });
