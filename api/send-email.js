@@ -57,38 +57,34 @@ function digitsOnly(value) {
   return (value || "").toString().replace(/\D/g, "");
 }
 
-// Format 10-digit number as (555) 123-4567
 function formatPhone(raw) {
   const d = digitsOnly(raw).replace(/^1/, "");
   if (d.length !== 10) return d;
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
-// Extract a clean public IPv4 from request headers
-// Returns empty string if none found — caller must use form-supplied IP instead
-function getPublicIpv4(req) {
+// Returns the first valid public IPv4 from request headers
+function getRealIp(req) {
+  // Vercel sets x-forwarded-for to the actual client IP
   const sources = [
-    req.headers["x-real-ip"],
     req.headers["x-forwarded-for"],
-    req.headers["cf-connecting-ip"], // Cloudflare
-    req.headers["x-client-ip"],
+    req.headers["x-real-ip"],
+    req.headers["cf-connecting-ip"],
   ];
 
   for (const src of sources) {
     if (!src) continue;
-    // x-forwarded-for can be a comma list — take the first
-    const candidates = src.split(",").map((s) => s.trim());
-    for (const ip of candidates) {
-      // Must be a valid public IPv4 — reject loopback, private, IPv6
-      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
-        const parts = ip.split(".").map(Number);
-        const isPrivate =
-          parts[0] === 10 ||
-          parts[0] === 127 ||
-          (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-          (parts[0] === 192 && parts[1] === 168);
-        if (!isPrivate) return ip;
-      }
+    for (const candidate of src.split(",")) {
+      const ip = candidate.trim();
+      // Must match IPv4 pattern
+      if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) continue;
+      const [a, b] = ip.split(".").map(Number);
+      // Skip private/loopback ranges
+      if (a === 10) continue;
+      if (a === 127) continue;
+      if (a === 172 && b >= 16 && b <= 31) continue;
+      if (a === 192 && b === 168) continue;
+      return ip; // first valid public IPv4
     }
   }
   return "";
@@ -113,6 +109,18 @@ export default async function handler(req, res) {
     const state = (data?.state || "").toUpperCase();
     const usedDepoProvera = (data?.UsedDepoProvera || "").trim();
 
+    // IP always comes from request headers — never trust user input for this
+    const ipAddress = getRealIp(req);
+    console.log(
+      "Client IP resolved:",
+      ipAddress,
+      "| headers:",
+      JSON.stringify({
+        "x-forwarded-for": req.headers["x-forwarded-for"],
+        "x-real-ip": req.headers["x-real-ip"],
+      }),
+    );
+
     // ── Validation ────────────────────────────────────────────────────
     const errors = {};
     if (!data?.fname) errors.fname = "required";
@@ -129,23 +137,6 @@ export default async function handler(req, res) {
     if (Object.keys(errors).length) {
       return res.status(400).json({ status: 4, errors: [errors] });
     }
-
-    // ── IP Resolution — priority order: ──────────────────────────────
-    // 1. Form-supplied IP (user's browser fetched it via ipify before submit)
-    // 2. Public IPv4 from request headers (Vercel passes real IP in x-forwarded-for)
-    // 3. Fallback empty string (endpoint will reject — better than sending garbage)
-    const formIp = (data?.IPAddress || "").trim();
-    const headerIp = getPublicIpv4(req);
-    const ipAddress = formIp || headerIp || "";
-
-    console.log(
-      "IP resolution — form:",
-      formIp,
-      "| header:",
-      headerIp,
-      "| using:",
-      ipAddress,
-    );
 
     const phoneFormatted = formatPhone(phoneRaw);
     const mobileFormatted = mobileRaw ? formatPhone(mobileRaw) : "";
@@ -172,15 +163,14 @@ export default async function handler(req, res) {
       VendorLeadId: data.VendorLeadId || "",
     };
 
-    // ── STEP 1: POST lead ─────────────────────────────────────────────
+    // ── POST lead ─────────────────────────────────────────────────────
     const formBody = new URLSearchParams();
     Object.entries(lead).forEach(([key, value]) => {
       if (value !== "") formBody.append(key, value);
     });
 
-    let postStatus = "";
-    let postResponse = "";
-
+    let postStatus = "",
+      postResponse = "";
     let postRes;
     try {
       postRes = await fetch(POST_URL, {
@@ -201,20 +191,18 @@ export default async function handler(req, res) {
 
     postResponse = await postRes.text();
     postStatus = `HTTP ${postRes.status} – ${postRes.statusText}`;
-    console.log("Lead POST result:", postStatus, postResponse);
-    console.log("Phone sent:", phoneFormatted, "| IP sent:", ipAddress);
+    console.log("Lead POST result:", postStatus, "|", postResponse);
 
     if (!postRes.ok) {
       return res.status(502).json({
-        error: "Lead endpoint rejected the submission.",
+        error: "Lead endpoint rejected.",
         status: postStatus,
         response: postResponse,
       });
     }
 
-    // ── STEP 2: Email ─────────────────────────────────────────────────
+    // ── Email ─────────────────────────────────────────────────────────
     const or = (v) => v || "—";
-
     const message = `
 New Depo Provera Lead — Digital Gen Media CPA Spec
 Post URL: ${POST_URL}
